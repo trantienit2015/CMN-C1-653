@@ -1,0 +1,42 @@
+# Agent Manifest — AgentRegistry entry point
+# AgentRegistry reads every key below at ROOT level. Nesting them under an
+# `agent:` block makes them invisible to the registry: namespace and enabled
+# fall back to defaults and name/version never resolve.
+id: "CMN-C1-653"
+name: "AWSIAMPermissionAuditAgent"
+namespace: "cmn"
+version: "0.1.0"
+enabled: true
+category: "Cat 1"
+industry: "CMN"
+
+# Base pattern reference (L1-direct inheritance; not an import target)
+base_type: "ToolCallingAgent"
+
+# Entry point — a single dotted import path (module.Class), not a module:/class:
+# split. AgentRegistry does class.rsplit(".", 1) to get (module, class_name).
+class: "src.graph.graph.Graph"
+
+# Security
+required_trust_level: "INTERNAL"
+
+# Compile-time gates. Both lists are declared explicitly.
+# secrets: Step 5 RemediationReport is LLM-essential (see docs/02_design.md); the three
+# Azure OpenAI connection values are resolved per-invocation via
+# src/services/azure_llm.py (LazyAzureOpenAILLM, framework.secrets.context.current_secrets()) —
+# never os.environ, never cached on the node instance. Missing any of them (or the LLM
+# call itself failing) does NOT block startup or fail the request: MainNode degrades to
+# its deterministic fallback report (src/nodes/main_node.py::_generate_remediation_report).
+# extras: "openai" ships shared.services.llm.azure_openai_client, which the adapter above
+# imports lazily (client_available()) so a runtime whose wheel omits it still boots on the
+# deterministic path.
+requires:
+  secrets:
+    - AZURE_OPENAI_API_KEY
+    - AZURE_OPENAI_ENDPOINT
+    - AZURE_OPENAI_DEPLOYMENT
+  extras:
+    - openai
+
+# Runtime parameters live in config/config.yaml. AgentRegistry loads that file
+# separately and passes its contents as Graph(config=...).
